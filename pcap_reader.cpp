@@ -196,7 +196,7 @@ int read_udp_header(int fd, udp_header *uh, int pkt_num)
 }
 
 #define RECV_ADDR "127.0.0.1"
-#define RECV_PORT 50001
+#define RECV_PORT 50000
 
 int main(int argc, char *args[])
 {
@@ -342,7 +342,7 @@ int main(int argc, char *args[])
 
         if(prev_ts_sec != 0 && prev_ts_usec != 0) {
           pkt_delay = (cur_ts_sec - prev_ts_sec) * 1000000 + (cur_ts_usec - prev_ts_usec);
-          usleep(pkt_delay-100);
+          usleep(pkt_delay);
         }
 
         mmtp_pkt_len = uh.len - sizeof(udp_header);
@@ -370,9 +370,9 @@ int main(int argc, char *args[])
           //usleep(time_diff);
         //}
 
-        //printf("%d bytes sent\n", sendto(sockfd, mmtp_pkt_buf, mmtp_pkt_len, 0, (struct sockaddr *)&recv_addr, sizeof(recv_addr)));
         if (j < pkt_start) continue;
-        sendto(sockfd, mmtp_pkt_buf, mmtp_pkt_len, 0, (struct sockaddr *)&recv_addr, sizeof(recv_addr));
+        printf("%d:%d %d bytes sent\n", i, j, sendto(sockfd, mmtp_pkt_buf, mmtp_pkt_len, 0, (struct sockaddr *)&recv_addr, sizeof(recv_addr)));
+        //sendto(sockfd, mmtp_pkt_buf, mmtp_pkt_len, 0, (struct sockaddr *)&recv_addr, sizeof(recv_addr));
 
         //gettimeofday(&last_tv, NULL);
 
