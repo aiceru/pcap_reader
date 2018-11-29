@@ -10,6 +10,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <limits.h>
+#include <time.h>
 
 using namespace std;
 
@@ -209,22 +210,17 @@ int main(int argc, char *args[])
   int target_port = 0;
   char *filename;
 
-  int prev_ts_sec = 0;
-  int prev_ts_usec = 0;
+  struct timespec elapsed_tv;
+  struct timespec last_tv;
+  struct timespec delay_tv;
 
-  int cur_ts_sec;
-  int cur_ts_usec;
-
-  struct timeval cur_tv;
-  struct timeval last_tv;
-
-  cur_tv.tv_sec = 0;
-  cur_tv.tv_usec = 0;
+  elapsed_tv.tv_sec = 0;
+  elapsed_tv.tv_nsec = 0;
   last_tv.tv_sec = 0;
-  last_tv.tv_usec = 0;
+  last_tv.tv_nsec = 0;
   int time_diff;
 
-  int pkt_delay = 0;
+  int pkt_elapsed = 0;
 
   filename = args[1];
   target_port = atoi(args[2]);
@@ -274,14 +270,17 @@ int main(int argc, char *args[])
       return ret;
     }
 
-    cur_ts_sec = 0;
-    cur_ts_usec = 0;
-    prev_ts_sec = 0;
-    prev_ts_usec = 0;
-
     if(pkt_limit == 0) {
       pkt_limit = INT_MAX;
     }
+
+    elapsed_tv.tv_sec = 0;
+    elapsed_tv.tv_nsec = 0;
+    last_tv.tv_sec = 0;
+    last_tv.tv_nsec = 0;
+    delay_tv.tv_sec = 0;
+    delay_tv.tv_nsec = 0;
+
     for(int j = 0; j < pkt_limit; j++) {
       ret = read_pcap_header(fd, &ph);
       if(ret < 0) {
@@ -337,12 +336,11 @@ int main(int argc, char *args[])
       }
 
       {
-        cur_ts_sec = ph.sec;
-        cur_ts_usec = ph.usec;
+        elapsed_tv.tv_sec = (time_t)ph.sec - last_tv.tv_sec;
+        elapsed_tv.tv_nsec = (long)(ph.usec*1000) - last_tv.tv_nsec;
 
-        if(prev_ts_sec != 0 && prev_ts_usec != 0) {
-          pkt_delay = (cur_ts_sec - prev_ts_sec) * 1000000 + (cur_ts_usec - prev_ts_usec);
-          usleep(pkt_delay);
+        if(last_tv.tv_sec != 0 && last_tv.tv_nsec != 0 && j % 10 != 0) {
+          nanosleep(&elapsed_tv, NULL);
         }
 
         mmtp_pkt_len = uh.len - sizeof(udp_header);
@@ -358,17 +356,6 @@ int main(int argc, char *args[])
           cout << "FEOF\n";
           break;
         }
-        //uint32_t mmtp_ts;
-        //memcpy(&mmtp_ts, mmtp_pkt_buf+4, 4);
-
-        //mmtp_ts = ntohl(mmtp_ts);
-        //memcpy(mmtp_pkt_buf + mmtp_pkt_len, &mmtp_ts, 4);
-
-        //gettimeofday(&cur_tv, NULL);
-        //time_diff = (cur_tv.tv_sec - last_tv.tv_sec) * 1000000 + (cur_tv.tv_usec - last_tv.tv_usec) - (int)pkt_delay;
-        //if(time_diff > 0) {
-          //usleep(time_diff);
-        //}
 
         if (j < pkt_start) continue;
         printf("%d:%d %d bytes sent\n", i, j, sendto(sockfd, mmtp_pkt_buf, mmtp_pkt_len, 0, (struct sockaddr *)&recv_addr, sizeof(recv_addr)));
@@ -376,8 +363,8 @@ int main(int argc, char *args[])
 
         //gettimeofday(&last_tv, NULL);
 
-        prev_ts_sec = cur_ts_sec;
-        prev_ts_usec = cur_ts_usec;
+        last_tv.tv_sec = ph.sec;
+        last_tv.tv_nsec = (long)(ph.usec*1000);
 
         free(mmtp_pkt_buf);
       }
